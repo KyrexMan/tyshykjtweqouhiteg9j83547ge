@@ -1,0 +1,100 @@
+getgenv().HeadLineESP = getgenv().HeadLineESP or false
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
+
+-- storage
+getgenv()._HeadLineESPObjects = getgenv()._HeadLineESPObjects or {}
+getgenv()._HeadLineESPConnections = getgenv()._HeadLineESPConnections or {}
+
+local function cleanup()
+    for _, obj in ipairs(getgenv()._HeadLineESPObjects) do
+        if obj and obj.Destroy then
+            obj:Destroy()
+        end
+    end
+    getgenv()._HeadLineESPObjects = {}
+
+    for _, conn in ipairs(getgenv()._HeadLineESPConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    getgenv()._HeadLineESPConnections = {}
+end
+
+local function createLine(character)
+    if not getgenv().HeadLineESP then return end
+
+    local player = Players:GetPlayerFromCharacter(character)
+    if not player or player == localPlayer then return end
+
+    local head = character:WaitForChild("Head", 5)
+    if not head then return end
+
+    -- Attachment on head
+    local att0 = Instance.new("Attachment")
+    att0.Parent = head
+
+    -- Invisible front part
+    local frontPart = Instance.new("Part")
+    frontPart.Size = Vector3.new(0.4, 0.4, 0.4)
+    frontPart.Shape = Enum.PartType.Cylinder
+    frontPart.Anchored = true
+    frontPart.CanCollide = false
+    frontPart.Transparency = 1
+    frontPart.Parent = workspace
+
+    local att1 = Instance.new("Attachment")
+    att1.Parent = frontPart
+
+    -- Beam
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = att0
+    beam.Attachment1 = att1
+    beam.Width0 = 0.12
+    beam.Width1 = 0.12
+    beam.Color = ColorSequence.new(Color3.fromRGB(0, 255, 0))
+    beam.FaceCamera = true
+    beam.Parent = head
+
+    table.insert(getgenv()._HeadLineESPObjects, att0)
+    table.insert(getgenv()._HeadLineESPObjects, att1)
+    table.insert(getgenv()._HeadLineESPObjects, beam)
+    table.insert(getgenv()._HeadLineESPObjects, frontPart)
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not getgenv().HeadLineESP or not character.Parent then
+            cleanup()
+            return
+        end
+
+        frontPart.CFrame = head.CFrame * CFrame.new(0, 0, -22.5)
+    end)
+
+    table.insert(getgenv()._HeadLineESPConnections, conn)
+end
+
+local function enable()
+    cleanup()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            if player.Character then
+                task.spawn(createLine, player.Character)
+            end
+            table.insert(
+                getgenv()._HeadLineESPConnections,
+                player.CharacterAdded:Connect(createLine)
+            )
+        end
+    end
+end
+
+-- MAIN TOGGLE LOGIC
+if getgenv().HeadLineESP then
+    enable()
+else
+    cleanup()
+end
